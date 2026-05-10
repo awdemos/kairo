@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod config;
 pub mod context;
 pub mod error;
 pub mod model;
@@ -8,6 +9,9 @@ pub mod types;
 pub mod workflow;
 
 pub use agent::{Agent, AgentConfig};
+pub use config::{
+    ApiConfig, KairoConfig, ProviderConfig, TelemetryConfig, ToolConfig,
+};
 
 #[cfg(test)]
 mod tests {

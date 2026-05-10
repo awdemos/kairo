@@ -15,15 +15,23 @@ categories.workspace = true
 kairo-core = { workspace = true }
 kairo-agents = { workspace = true }
 kairo-orchestrator = { workspace = true }
+kairo-providers = { workspace = true }
+kairo-council = { workspace = true }
+kairo-tools = { workspace = true }
+kairo-memory = { workspace = true }
+kairo-api = { workspace = true }
+kairo-telemetry = { workspace = true }
 
 clap = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
 tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
+chrono = { workspace = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }

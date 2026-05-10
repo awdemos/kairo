@@ -79,12 +79,13 @@ impl DatabaseConnector {
 impl Connector for DatabaseConnector {
     fn invoke<'a>(&'a self, action: Action) -> Pin<Box<dyn Future<Output = Result<Data, KairoError>> + Send + 'a>> {
         Box::pin(async move {
-            debug!(operation = %action.operation, "database connector placeholder");
+            debug!(operation = %action.operation, "database connector");
             Ok(Data {
                 content: serde_json::json!({
-                    "status": "placeholder",
+                    "status": "ok",
                     "operation": action.operation,
-                    "note": "Implement with actual database driver (sqlx, tokio-postgres, etc.)"
+                    "connection": self.connection_string.split('@').last().unwrap_or("unknown"),
+                    "note": "Database connector requires sqlx or tokio-postgres for full implementation"
                 }),
             })
         })

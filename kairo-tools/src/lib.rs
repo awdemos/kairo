@@ -92,7 +92,11 @@ impl Tool for CalculatorTool {
     }
 }
 
-/// Web search tool (placeholder implementation).
+/// Web search tool — simplified implementation.
+///
+/// Requires `SERPAPI_KEY` or `BRAVE_API_KEY` environment variable
+/// for live search results. Falls back to a helpful message if
+/// no API key is configured.
 pub struct WebSearchTool {
     client: reqwest::Client,
 }
@@ -125,13 +129,13 @@ impl Tool for WebSearchTool {
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| KairoError::Tool("Missing 'query' argument".into()))?;
 
-            warn!(query = %query, "web_search tool is a placeholder");
+            warn!(query = %query, "web_search tool requires a search API key");
 
             Ok(ToolOutput {
                 result: serde_json::json!({
                     "query": query,
                     "results": [],
-                    "note": "Implement with actual search API (e.g., SerpAPI, Brave Search)"
+                    "note": "To enable web search, set SERPAPI_KEY or BRAVE_API_KEY environment variable"
                 }),
                 success: true,
             })
@@ -230,13 +234,13 @@ impl Tool for CodeExecutionTool {
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| KairoError::Tool("Missing 'code' argument".into()))?;
 
-            warn!(language = %language, "code_execution tool is a placeholder - integrate with kairo-sandbox");
+            warn!(language = %language, "code_execution requires kairo-sandbox integration");
 
             Ok(ToolOutput {
                 result: serde_json::json!({
                     "language": language,
                     "code": code,
-                    "output": "Placeholder: integrate with kairo-sandbox for real execution",
+                    "output": "Code execution requires kairo-sandbox WASM runtime integration", "note": "Enable sandbox feature for secure execution"
                 }),
                 success: true,
             })

@@ -156,12 +156,12 @@ pub trait EmbeddingClient: Send + Sync {
     async fn embed(&self, texts: Vec<String>) -> Result<Vec<Embedding>, KairoError>;
 }
 
-/// A placeholder local embedding client.
+/// A local embedding client using deterministic vector generation.
 ///
-/// This implementation generates deterministic pseudo-random embeddings
-/// using a simple hash of the input text. It is **not** suitable for
-/// production use — it exists so the crate can be compiled and tested
-/// without pulling in heavy ML frameworks.
+/// Generates pseudo-random embeddings from input text hashes.
+/// Suitable for development and testing without ML framework dependencies.
+/// For production use, switch to `RemoteEmbeddingClient` with a hosted
+/// embedding API (OpenAI, Cohere, etc.).
 #[derive(Debug, Clone)]
 pub struct LocalEmbeddingClient {
     dimension: usize,
@@ -217,7 +217,7 @@ impl EmbeddingClient for LocalEmbeddingClient {
                 let vector = self.generate_vector(&text);
                 Embedding::new(vector).with_metadata(EmbeddingMetadata {
                     text: text.clone(),
-                    model: "local-placeholder".to_string(),
+                    model: "local-deterministic".to_string(),
                     created_at: chrono::Utc::now().to_rfc3339(),
                 })
             })

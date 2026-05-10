@@ -14,7 +14,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tracing::{error, info};
 use uuid::Uuid;
 
-use kairo_core::{Agent, AgentConfig, Context, KairoError, Message, ModelId, Role, Workflow};
+use kairo_core::{Context, KairoError, Message, Role, Workflow};
 use kairo_agents::ReActAgent;
 use kairo_orchestrator::{WorkflowEngine, WorkflowResult};
 use kairo_telemetry::init as init_telemetry;
@@ -88,7 +88,7 @@ async fn chat_completions(
 ) -> Result<Json<ChatResponse>, (StatusCode, Json<ErrorResponse>)> {
     let model = req.model.as_deref().unwrap_or("gpt-4o");
 
-    let messages: Vec<Message> = req.messages.into_iter().map(|m| Message {
+    let _messages: Vec<Message> = req.messages.into_iter().map(|m| Message {
         role: match m.role.as_str() {
             "system" => Role::System,
             "assistant" => Role::Assistant,
@@ -169,7 +169,7 @@ async fn get_workflow(
 }
 
 pub async fn run_server(state: ApiState, port: u16) -> Result<(), KairoError> {
-    init_telemetry().map_err(|e| KairoError::Internal(e.to_string()))?;
+    let _guard = init_telemetry().map_err(|e| KairoError::Internal(e.to_string()))?;
 
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
     info!("Starting Kairo API server on {}", addr);
