@@ -21,7 +21,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 rust-version = "1.81"
 license = "MIT OR Apache-2.0"
@@ -91,19 +91,19 @@ petgraph = "0.7"
 moka = { version = "0.12", features = ["future"] }
 
 # Workspace internal dependencies (to be published)
-kairo-core = { path = "kairo-core", version = "0.1.0" }
-kairo-macros = { path = "kairo-macros", version = "0.1.0" }
-kairo-telemetry = { path = "kairo-telemetry", version = "0.1.0" }
-kairo-embeddings = { path = "kairo-embeddings", version = "0.1.0" }
-kairo-sandbox = { path = "kairo-sandbox", version = "0.1.0" }
-kairo-memory = { path = "kairo-memory", version = "0.1.0" }
-kairo-connectors = { path = "kairo-connectors", version = "0.1.0" }
-kairo-providers = { path = "kairo-providers", version = "0.1.0" }
-kairo-tools = { path = "kairo-tools", version = "0.1.0" }
-kairo-council = { path = "kairo-council", version = "0.1.0" }
-kairo-agents = { path = "kairo-agents", version = "0.1.0" }
-kairo-orchestrator = { path = "kairo-orchestrator", version = "0.1.0" }
-kairo-api = { path = "kairo-api", version = "0.1.0" }
+kairo-core = { path = "kairo-core", version = "1.0.0" }
+kairo-macros = { path = "kairo-macros", version = "1.0.0" }
+kairo-telemetry = { path = "kairo-telemetry", version = "1.0.0" }
+kairo-embeddings = { path = "kairo-embeddings", version = "1.0.0" }
+kairo-sandbox = { path = "kairo-sandbox", version = "1.0.0" }
+kairo-memory = { path = "kairo-memory", version = "1.0.0" }
+kairo-connectors = { path = "kairo-connectors", version = "1.0.0" }
+kairo-providers = { path = "kairo-providers", version = "1.0.0" }
+kairo-tools = { path = "kairo-tools", version = "1.0.0" }
+kairo-council = { path = "kairo-council", version = "1.0.0" }
+kairo-agents = { path = "kairo-agents", version = "1.0.0" }
+kairo-orchestrator = { path = "kairo-orchestrator", version = "1.0.0" }
+kairo-api = { path = "kairo-api", version = "1.0.0" }
 
 # Testing / Benchmarking
 criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
