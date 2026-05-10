@@ -129,7 +129,9 @@ impl HybridMemory {
     }
 
     pub async fn store(&self, entry: MemoryEntry) -> Result<(), KairoError> {
-        let id = entry.id.to_string();
+        let id = entry.embedding.as_ref()
+            .map(|e| e.id.clone())
+            .unwrap_or_else(|| entry.id.to_string());
         self.episodic.store(entry.clone()).await;
         self.semantic.store(entry.clone()).await?;
         let mut map = self.entries_by_id.write().await;
@@ -174,5 +176,72 @@ impl HybridMemory {
 impl Default for HybridMemory {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kairo_embeddings::Embedding;
+
+    #[tokio::test]
+    async fn test_episodic_memory() {
+        let memory = EpisodicMemory::new();
+        let entry = MemoryEntry {
+            id: Uuid::new_v4(),
+            content: "test content".into(),
+            embedding: None,
+            metadata: MemoryMetadata::default(),
+            created_at: Utc::now(),
+        };
+        memory.store(entry.clone()).await;
+
+        let recent = memory.retrieve_recent(10).await;
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].content, "test content");
+    }
+
+    #[tokio::test]
+    async fn test_semantic_memory() {
+        let memory = SemanticMemory::new();
+        let embedding = Embedding::with_id("emb-1", vec![1.0, 0.0, 0.0]);
+        let entry = MemoryEntry {
+            id: Uuid::new_v4(),
+            content: "hello world".into(),
+            embedding: Some(embedding),
+            metadata: MemoryMetadata::default(),
+            created_at: Utc::now(),
+        };
+        memory.store(entry).await.unwrap();
+
+        let query = Embedding::with_id("query", vec![1.0, 0.0, 0.0]);
+        let results = memory.search(&query, 5).await.unwrap();
+        assert!(!results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_hybrid_memory() {
+        let memory = HybridMemory::new();
+        let embedding = Embedding::with_id("emb-1", vec![1.0, 0.0, 0.0]);
+        let entry = MemoryEntry {
+            id: Uuid::new_v4(),
+            content: "hybrid test".into(),
+            embedding: Some(embedding),
+            metadata: MemoryMetadata::default(),
+            created_at: Utc::now(),
+        };
+        memory.store(entry).await.unwrap();
+
+        let query = Embedding::with_id("query", vec![1.0, 0.0, 0.0]);
+        let results = memory.search(&query, 5).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].content, "hybrid test");
+
+        let recent = memory.recent(10).await;
+        assert_eq!(recent.len(), 1);
+
+        let messages = memory.to_messages(10).await;
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].content, "hybrid test");
     }
 }

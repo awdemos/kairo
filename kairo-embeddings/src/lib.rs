@@ -479,3 +479,115 @@ pub mod prelude {
         LocalEmbeddingClient, RemoteEmbeddingClient, RemoteEmbeddingConfig,
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dot_product() {
+        let a = vec![1.0, 2.0, 3.0];
+        let b = vec![4.0, 5.0, 6.0];
+        assert_eq!(dot_product(&a, &b), 32.0);
+    }
+
+    #[test]
+    fn test_l2_norm() {
+        let v = vec![3.0, 4.0];
+        assert_eq!(l2_norm(&v), 5.0);
+    }
+
+    #[test]
+    fn test_cosine_similarity_identical() {
+        let a = vec![1.0, 2.0, 3.0];
+        let b = vec![1.0, 2.0, 3.0];
+        let sim = cosine_similarity(&a, &b);
+        assert!((sim - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_cosine_similarity_orthogonal() {
+        let a = vec![1.0, 0.0];
+        let b = vec![0.0, 1.0];
+        let sim = cosine_similarity(&a, &b);
+        assert!(sim.abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_euclidean_distance() {
+        let a = vec![1.0, 2.0];
+        let b = vec![4.0, 6.0];
+        let dist = euclidean_distance(&a, &b);
+        assert!((dist - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_normalize() {
+        let v = vec![3.0, 4.0];
+        let normalized = normalize(&v);
+        let norm = l2_norm(&normalized);
+        assert!((norm - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_normalize_zero_vector() {
+        let v = vec![0.0, 0.0, 0.0];
+        let normalized = normalize(&v);
+        assert_eq!(normalized, vec![0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_embedding_creation() {
+        let emb = Embedding::new(vec![1.0, 2.0, 3.0]);
+        assert_eq!(emb.dim(), 3);
+        assert!(!emb.id.is_empty());
+    }
+
+    #[test]
+    fn test_embedding_with_id() {
+        let emb = Embedding::with_id("test-123", vec![1.0, 2.0]);
+        assert_eq!(emb.id, "test-123");
+    }
+
+    #[tokio::test]
+    async fn test_in_memory_embedding_store() {
+        let store = InMemoryEmbeddingStore::new();
+        let emb = Embedding::with_id("test-1", vec![1.0, 0.0, 0.0]);
+        store.upsert(emb.clone()).await.unwrap();
+
+        assert_eq!(store.len().await.unwrap(), 1);
+        assert!(!store.is_empty().await.unwrap());
+
+        let retrieved = store.get("test-1").await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().id, "test-1");
+
+        let results = store.search(&[1.0, 0.0, 0.0], 5).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert!((results[0].1 - 1.0).abs() < 1e-6);
+
+        let deleted = store.delete("test-1").await.unwrap();
+        assert!(deleted);
+        assert_eq!(store.len().await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_local_embedding_client() {
+        let client = LocalEmbeddingClient::new(128);
+        let embeddings = client.embed(vec!["hello".into(), "world".into()]).await.unwrap();
+        assert_eq!(embeddings.len(), 2);
+        assert_eq!(embeddings[0].dim(), 128);
+        assert!(!embeddings[0].id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_local_embedding_client_deterministic() {
+        let client1 = LocalEmbeddingClient::new(64).with_seed(42);
+        let client2 = LocalEmbeddingClient::new(64).with_seed(42);
+
+        let emb1 = client1.embed(vec!["test".into()]).await.unwrap();
+        let emb2 = client2.embed(vec!["test".into()]).await.unwrap();
+
+        assert_eq!(emb1[0].vector, emb2[0].vector);
+    }
+}

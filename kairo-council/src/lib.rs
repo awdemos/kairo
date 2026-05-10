@@ -136,3 +136,65 @@ pub async fn bootstrap_council(council: &ModelCouncil) {
         cost_per_1k: 0.0005,
     }).await;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_model_council_registration() {
+        let council = ModelCouncil::new();
+        council.register_model(CapabilityScore {
+            model: ModelId::Gpt4o,
+            score: 0.95,
+            latency_ms: 800,
+            cost_per_1k: 0.005,
+        }).await;
+
+        let models = council.list_models().await;
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].model, ModelId::Gpt4o);
+    }
+
+    #[tokio::test]
+    async fn test_model_council_route() {
+        let council = ModelCouncil::new()
+            .with_api_key(ModelId::Gpt4o, "test-key")
+            .with_api_key(ModelId::Claude3_5Sonnet, "test-key");
+
+        council.register_model(CapabilityScore {
+            model: ModelId::Gpt4o,
+            score: 0.95,
+            latency_ms: 800,
+            cost_per_1k: 0.005,
+        }).await;
+        council.register_model(CapabilityScore {
+            model: ModelId::Claude3_5Sonnet,
+            score: 0.93,
+            latency_ms: 1200,
+            cost_per_1k: 0.003,
+        }).await;
+
+        let decision = council.route(&TaskType::CodeGeneration, &CompletionOptions::default()).await;
+        assert!(decision.is_ok());
+        let decision = decision.unwrap();
+        assert_eq!(decision.model, ModelId::Gpt4o);
+        assert!((decision.confidence - 0.95).abs() < 1e-6);
+    }
+
+    #[tokio::test]
+    async fn test_model_council_route_empty() {
+        let council = ModelCouncil::new();
+        let result = council.route(&TaskType::Research, &CompletionOptions::default()).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), KairoError::Routing(_)));
+    }
+
+    #[tokio::test]
+    async fn test_default_council() {
+        let council = default_council("test-key");
+        bootstrap_council(&council).await;
+        let models = council.list_models().await;
+        assert_eq!(models.len(), 3);
+    }
+}

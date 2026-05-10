@@ -253,3 +253,70 @@ pub async fn default_registry() -> ToolRegistry {
     registry.register(Arc::new(CodeExecutionTool)).await;
     registry
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kairo_core::ToolInput;
+
+    #[tokio::test]
+    async fn test_tool_registry() {
+        let registry = ToolRegistry::new();
+        let tool = Arc::new(CalculatorTool);
+        registry.register(tool.clone()).await;
+
+        let tools = registry.list().await;
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0], "calculator");
+
+        let retrieved = registry.get("calculator").await;
+        assert!(retrieved.is_some());
+
+        let missing = registry.get("nonexistent").await;
+        assert!(missing.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_calculator_tool() {
+        let calc = CalculatorTool;
+        let input = ToolInput {
+            arguments: serde_json::json!({"expression": "2 + 3 * 4"}),
+        };
+        let output = calc.execute(input).await.unwrap();
+        assert!(output.success);
+        let result = output.result.get("result").unwrap().as_f64().unwrap();
+        assert_eq!(result, 14.0);
+    }
+
+    #[tokio::test]
+    async fn test_calculator_tool_missing_expression() {
+        let calc = CalculatorTool;
+        let input = ToolInput {
+            arguments: serde_json::json!({}),
+        };
+        let result = calc.execute(input).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_web_search_tool() {
+        let tool = WebSearchTool::new();
+        let input = ToolInput {
+            arguments: serde_json::json!({"query": "Rust programming"}),
+        };
+        let output = tool.execute(input).await.unwrap();
+        assert!(output.success);
+        assert!(output.result.get("query").is_some());
+    }
+
+    #[tokio::test]
+    async fn test_default_registry() {
+        let registry = default_registry().await;
+        let tools = registry.list().await;
+        assert_eq!(tools.len(), 4);
+        assert!(tools.contains(&"calculator".to_string()));
+        assert!(tools.contains(&"web_search".to_string()));
+        assert!(tools.contains(&"filesystem".to_string()));
+        assert!(tools.contains(&"code_execution".to_string()));
+    }
+}

@@ -155,3 +155,61 @@ impl Default for WorkflowEngine {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kairo_core::{Task, TaskStatus, Workflow, WorkflowStatus};
+
+    #[tokio::test]
+    async fn test_workflow_engine_register() {
+        let engine = WorkflowEngine::new();
+        let workflow = Workflow {
+            id: Uuid::new_v4(),
+            name: "test".into(),
+            tasks: vec![],
+            subtasks: vec![],
+            status: WorkflowStatus::Draft,
+        };
+
+        let result = engine.register(workflow, HashMap::new()).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_workflow_engine_get_status() {
+        let engine = WorkflowEngine::new();
+        let id = Uuid::new_v4();
+        let workflow = Workflow {
+            id,
+            name: "test".into(),
+            tasks: vec![],
+            subtasks: vec![],
+            status: WorkflowStatus::Draft,
+        };
+
+        engine.register(workflow, HashMap::new()).await.unwrap();
+        let status = engine.get_status(id).await;
+        assert_eq!(status, Some(WorkflowStatus::Draft));
+    }
+
+    #[tokio::test]
+    async fn test_workflow_engine_missing_workflow() {
+        let engine = WorkflowEngine::new();
+        let id = Uuid::new_v4();
+        let status = engine.get_status(id).await;
+        assert!(status.is_none());
+    }
+
+    #[test]
+    fn test_workflow_result_creation() {
+        let id = Uuid::new_v4();
+        let result = WorkflowResult {
+            workflow_id: id,
+            outputs: HashMap::new(),
+            status: WorkflowStatus::Completed,
+        };
+        assert_eq!(result.workflow_id, id);
+        assert_eq!(result.status, WorkflowStatus::Completed);
+    }
+}
