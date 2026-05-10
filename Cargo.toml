@@ -1,0 +1,140 @@
+[workspace]
+members = [
+    "kairo-core",
+    "kairo-macros",
+    "kairo-telemetry",
+    "kairo-embeddings",
+    "kairo-sandbox",
+    "kairo-memory",
+    "kairo-connectors",
+    "kairo-providers",
+    "kairo-tools",
+    "kairo-council",
+    "kairo-agents",
+    "kairo-orchestrator",
+    "kairo-api",
+    "kairo-cli",
+    "kairo-edge",
+    "kairo-tests",
+    "xtask",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.81"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/kairo-ai/kairo"
+homepage = "https://kairo.ai"
+documentation = "https://docs.rs/kairo"
+authors = ["Kairo Contributors"]
+keywords = ["ai", "agents", "llm", "orchestration", "workflow"]
+categories = ["asynchronous", "network-programming", "science"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+tokio-stream = "0.1"
+tokio-test = "0.4"
+futures = "0.3"
+
+# HTTP / Web
+axum = { version = "0.8", features = ["macros"] }
+axum-server = "0.7"
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "compression-br", "trace"] }
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls", "gzip"] }
+hyper = { version = "1.5", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order", "float_roundtrip"] }
+postcard = { version = "1.0", features = ["alloc"] }
+schemars = "0.8"
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+tracing-error = "0.2"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+opentelemetry = "0.27"
+opentelemetry_sdk = "0.27"
+opentelemetry-otlp = "0.27"
+tracing-opentelemetry = "0.28"
+metrics = "0.24"
+metrics-exporter-prometheus = "0.16"
+
+# Types / Utilities
+uuid = { version = "1.10", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+pin-project = "1.1"
+bytes = "1.8"
+
+# Validation / Schema
+validator = { version = "0.19", features = ["derive"] }
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# Configuration
+config = "0.15"
+
+# Graph / DAG
+petgraph = "0.7"
+
+# Caching
+moka = { version = "0.12", features = ["future"] }
+
+# Workspace internal dependencies (to be published)
+kairo-core = { path = "kairo-core", version = "0.1.0" }
+kairo-macros = { path = "kairo-macros", version = "0.1.0" }
+kairo-telemetry = { path = "kairo-telemetry", version = "0.1.0" }
+kairo-embeddings = { path = "kairo-embeddings", version = "0.1.0" }
+kairo-sandbox = { path = "kairo-sandbox", version = "0.1.0" }
+kairo-memory = { path = "kairo-memory", version = "0.1.0" }
+kairo-connectors = { path = "kairo-connectors", version = "0.1.0" }
+kairo-providers = { path = "kairo-providers", version = "0.1.0" }
+kairo-tools = { path = "kairo-tools", version = "0.1.0" }
+kairo-council = { path = "kairo-council", version = "0.1.0" }
+kairo-agents = { path = "kairo-agents", version = "0.1.0" }
+kairo-orchestrator = { path = "kairo-orchestrator", version = "0.1.0" }
+kairo-api = { path = "kairo-api", version = "0.1.0" }
+
+# Testing / Benchmarking
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+proptest = "1.6"
+mockall = "0.13"
+insta = "1.41"
+
+meval = "0.2"
+serde-wasm-bindgen = "0.6"
+
+# Dev helpers
+pretty_assertions = "1.4"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16
+strip = "symbols"
+panic = "abort"
+
+[profile.release-wasm]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.bench]
+inherits = "release"
+debug = true

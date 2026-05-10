@@ -1,0 +1,31 @@
+[package]
+name = "kairo-agents"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+kairo-core = { workspace = true }
+kairo-tools = { workspace = true }
+kairo-memory = { workspace = true }
+kairo-providers = { workspace = true }
+kairo-council = { workspace = true }
+kairo-telemetry = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }

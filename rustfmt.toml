@@ -1,0 +1,37 @@
+# Rustfmt configuration for Kairo
+# https://rust-lang.github.io/rustfmt/
+
+edition = "2021"
+version = "Two"
+
+# Line width
+max_width = 100
+chain_width = 80
+array_width = 80
+
+# Formatting style
+use_small_heuristics = "Default"
+reorder_imports = true
+reorder_modules = true
+remove_nested_parens = true
+
+# Comments
+normalize_comments = true
+wrap_comments = true
+comment_width = 80
+
+# Macros
+format_macro_matchers = true
+format_macro_bodies = true
+
+# Imports
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
+
+# Misc
+match_arm_blocks = false
+match_block_trailing_comma = true
+trailing_comma = "Vertical"
+use_field_init_shorthand = true
+use_try_shorthand = true
+format_code_in_doc_comments = true

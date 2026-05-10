@@ -1,0 +1,28 @@
+# Clippy configuration for Kairo
+# https://doc.rust-lang.org/clippy/
+
+# Deny certain lints
+deny = [
+    "clippy::all",
+    "clippy::pedantic",
+    "clippy::cargo",
+]
+
+# Allow specific pedantic lints that are too noisy for this project
+allow = [
+    "clippy::module_name_repetitions",
+    "clippy::multiple_crate_versions",
+    "clippy::cargo_common_metadata",
+]
+
+# Warnings we want to catch
+warn = [
+    "clippy::unwrap_used",
+    "clippy::expect_used",
+    "clippy::panic",
+    "clippy::todo",
+    "clippy::dbg_macro",
+]
+
+# Custom configuration
+msrv = "1.81"
