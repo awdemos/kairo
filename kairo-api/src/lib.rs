@@ -74,7 +74,7 @@ pub fn app(state: ApiState) -> Router {
         .route("/health", get(health_check))
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/workflows", post(create_workflow))
-        .route("/v1/workflows/:id", get(get_workflow))
+        .route("/v1/workflows/{id}", get(get_workflow))
         .with_state(state)
 }
 

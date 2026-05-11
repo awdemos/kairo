@@ -52,7 +52,7 @@ pub fn init_tracing() -> Result<()> {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
 
-    tracing_subscriber::fmt()
+    let result = tracing_subscriber::fmt()
         .with_env_filter(env_filter)
         .json()
         .with_current_span(true)
@@ -60,10 +60,16 @@ pub fn init_tracing() -> Result<()> {
         .with_target(true)
         .with_thread_ids(true)
         .with_line_number(true)
-        .try_init()
-        .map_err(|e| TelemetryError::TracingInit(e.to_string()))?;
+        .try_init();
 
-    Ok(())
+    match result {
+        Ok(()) => Ok(()),
+        Err(e) if e.to_string().contains("already been set") => {
+            tracing::debug!("Tracing already initialized, skipping");
+            Ok(())
+        }
+        Err(e) => Err(TelemetryError::TracingInit(e.to_string())),
+    }
 }
 
 static PROMETHEUS_HANDLE: OnceLock<metrics_exporter_prometheus::PrometheusHandle> = OnceLock::new();
