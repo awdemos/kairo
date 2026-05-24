@@ -112,6 +112,22 @@ curl -X POST http://localhost:3000/v1/workflows \
   }'
 ```
 
+
+### Docker
+
+Build and run Kairo in a container:
+
+```bash
+# Build the image
+docker build -t kairo .
+
+# Run the API server
+docker run -p 3000:3000 -e OPENAI_API_KEY=sk-... kairo
+
+# Run a chat command
+docker run -e OPENAI_API_KEY=sk-... kairo chat --message "Hello"
+```
+
 ## Configuration
 
 Kairo reads configuration from environment variables:
@@ -196,7 +212,15 @@ Dual-licensed under MIT or Apache-2.0. See [LICENSE-MIT](./LICENSE-MIT) and [LIC
 
 ## Contributing
 
-Contributions welcome! Please read our contributing guidelines (TBD) and open an issue before major changes.
+We welcome contributions of all sizes. To get started:
+
+1. Fork the repository and create a feature branch
+2. Make your changes with tests where appropriate
+3. Run `cargo fmt --all` and `cargo clippy --all-targets --all-features`
+4. Ensure `cargo test --workspace` passes
+5. Open a pull request with a clear description of the changes
+
+For major changes, please open an issue first to discuss the proposed design.
 
 ## Acknowledgments
 

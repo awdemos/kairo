@@ -12,7 +12,7 @@ use kairo_tools::default_registry;
 #[derive(Parser)]
 #[command(name = "kairo")]
 #[command(about = "Kairo - Agentic AI Orchestrator CLI")]
-#[command(version = "0.1.0")]
+#[command(version = "1.0.0")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
