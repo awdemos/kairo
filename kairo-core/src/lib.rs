@@ -3,6 +3,7 @@ pub mod config;
 pub mod context;
 pub mod error;
 pub mod model;
+pub mod model_id;
 pub mod provider_error;
 pub mod task;
 pub mod traits;

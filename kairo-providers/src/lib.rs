@@ -551,27 +551,37 @@ fn is_retryable(status: u16) -> bool {
 
 /// Factory function to create a provider from a ModelId and API key.
 pub fn create_provider(model: &ModelId, api_key: &str) -> Result<Arc<dyn Provider>, KairoError> {
-    match model {
-        ModelId::Gpt4o | ModelId::Gpt4oMini | ModelId::Gpt4 | ModelId::Gpt4Turbo | ModelId::Gpt3_5Turbo | ModelId::O1 | ModelId::O3Mini => {
-            Ok(Arc::new(OpenAiProvider::new(api_key, model.to_string())))
-        }
-        ModelId::Claude3_5Sonnet | ModelId::Claude3Opus | ModelId::Claude3Haiku | ModelId::Claude3_5Haiku => {
-            Ok(Arc::new(AnthropicProvider::new(api_key, model.to_string())))
-        }
-        ModelId::Gemini2_0Flash | ModelId::Gemini1_5Pro | ModelId::Gemini1_5Flash => {
-            Ok(Arc::new(GeminiProvider::new(api_key, model.to_string())))
-        }
-        ModelId::Custom(name) => {
-            if name.starts_with("gpt-") || name.starts_with("o1") || name.starts_with("o3") {
-                Ok(Arc::new(OpenAiProvider::new(api_key, name.clone())))
-            } else if name.starts_with("claude-") {
-                Ok(Arc::new(AnthropicProvider::new(api_key, name.clone())))
-            } else if name.starts_with("gemini-") {
-                Ok(Arc::new(GeminiProvider::new(api_key, name.clone())))
-            } else {
-                Err(KairoError::Model(format!("Unsupported model: {}", name)))
-            }
-        }
+    let canonical = if let ModelId::Custom(name) = model {
+        ModelId::resolve(name).unwrap_or_else(|| model.clone())
+    } else {
+        model.clone()
+    };
+
+    match &canonical {
+        ModelId::Gpt4o
+        | ModelId::Gpt4oMini
+        | ModelId::Gpt4
+        | ModelId::Gpt4Turbo
+        | ModelId::Gpt3_5Turbo
+        | ModelId::O1
+        | ModelId::O1Mini
+        | ModelId::O3
+        | ModelId::O3Mini
+        | ModelId::O4
+        | ModelId::O4Mini => Ok(Arc::new(OpenAiProvider::new(api_key, canonical.to_string()))),
+        ModelId::Claude3_5Sonnet
+        | ModelId::Claude3Opus
+        | ModelId::Claude3Haiku
+        | ModelId::Claude3_5Haiku
+        | ModelId::Claude4
+        | ModelId::Claude4Opus => Ok(Arc::new(AnthropicProvider::new(api_key, canonical.to_string()))),
+        ModelId::Gemini2_0Flash
+        | ModelId::Gemini2_0Pro
+        | ModelId::Gemini2_5Flash
+        | ModelId::Gemini2_5Pro
+        | ModelId::Gemini1_5Pro
+        | ModelId::Gemini1_5Flash => Ok(Arc::new(GeminiProvider::new(api_key, canonical.to_string()))),
+        ModelId::Custom(name) => Err(KairoError::Model(format!("Unsupported model: {}", name))),
         _ => Err(KairoError::Model(format!(
             "No provider available for model: {:?}",
             model
