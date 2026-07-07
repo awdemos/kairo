@@ -103,3 +103,65 @@ impl<S: WorkflowStore> Executor<S> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dag::DagBuilder;
+    use crate::InMemoryWorkflowStore;
+    use kairo_agents::AgentResult;
+    use kairo_core::{Context, KairoError, Task, TaskType, TokenUsage, Workflow, WorkflowStatus};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use uuid::Uuid;
+
+    struct FakeRunner {
+        calls: AtomicUsize,
+    }
+
+    #[async_trait::async_trait]
+    impl TaskRunner for FakeRunner {
+        async fn run(&self, _ctx: Context) -> Result<AgentResult, KairoError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            Ok(AgentResult {
+                output: "done".into(),
+                thoughts: vec![],
+                tool_calls: vec![],
+                token_usage: TokenUsage {
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    total_tokens: 0,
+                },
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn test_executor_runs_single_task() {
+        let workflow = Workflow {
+            id: Uuid::new_v4(),
+            name: "test".into(),
+            tasks: vec![Task {
+                id: Uuid::new_v4(),
+                task_type: TaskType::Research,
+                description: "task 1".into(),
+                input: serde_json::Value::Null,
+                expected_output: None,
+                assigned_model: None,
+            }],
+            subtasks: vec![],
+            status: WorkflowStatus::Draft,
+        };
+        let store = InMemoryWorkflowStore::new();
+        store.create(workflow.clone()).await.unwrap();
+        let dag = DagBuilder::build(&workflow).unwrap();
+        let runner = Arc::new(FakeRunner { calls: AtomicUsize::new(0) });
+        let executor = Executor::new(store.clone(), runner.clone());
+        let result = executor
+            .execute(workflow.id, dag, Context::new(Uuid::new_v4()))
+            .await
+            .unwrap();
+        assert_eq!(result.status, WorkflowStatus::Completed);
+        assert_eq!(runner.calls.load(Ordering::SeqCst), 1);
+    }
+}
