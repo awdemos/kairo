@@ -20,6 +20,10 @@ wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 serde-wasm-bindgen = { workspace = true }
 chrono = { workspace = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[features]
+console_error_panic_hook = ["dep:console_error_panic_hook"]
 
 [dev-dependencies]
 tokio-test = { workspace = true }

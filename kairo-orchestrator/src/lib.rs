@@ -1,19 +1,22 @@
-use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::visit::Topo;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{debug, error, info, instrument};
+use tracing::instrument;
 use uuid::Uuid;
 
-use kairo_core::{
-    Agent, CompletionOptions, CompletionResponse, Context, KairoError, Message, ModelId, Role,
-    Task, TaskStatus, Workflow, WorkflowStatus,
-};
-use kairo_agents::ReActAgent;
+use kairo_core::{Context, KairoError, Workflow, WorkflowStatus};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+pub mod dag;
+pub mod executor;
+pub mod runner;
+pub mod store;
+
+pub use runner::TaskRunner;
+pub use store::{InMemoryWorkflowStore, TaskState, WorkflowRecord, WorkflowStore};
+
+use crate::dag::DagBuilder;
+use crate::executor::Executor;
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WorkflowResult {
     pub workflow_id: Uuid,
     pub outputs: HashMap<Uuid, String>,
@@ -21,132 +24,62 @@ pub struct WorkflowResult {
 }
 
 pub struct WorkflowEngine {
-    workflows: RwLock<HashMap<Uuid, WorkflowState>>,
-}
-
-#[derive(Debug)]
-struct WorkflowState {
-    workflow: Workflow,
-    graph: DiGraph<WorkflowNode, ()>,
-    node_map: HashMap<Uuid, NodeIndex>,
-    outputs: HashMap<Uuid, String>,
-}
-
-#[derive(Debug, Clone)]
-struct WorkflowNode {
-    id: Uuid,
-    name: String,
-    status: TaskStatus,
-    agent: Option<Arc<ReActAgent>>,
+    store: InMemoryWorkflowStore,
 }
 
 impl WorkflowEngine {
     pub fn new() -> Self {
         Self {
-            workflows: RwLock::new(HashMap::new()),
+            store: InMemoryWorkflowStore::new(),
         }
     }
 
     #[instrument(skip(self))]
-    pub async fn register(&self, workflow: Workflow, agents: HashMap<Uuid, Arc<ReActAgent>>) -> Result<(), KairoError> {
-        let mut graph = DiGraph::new();
-        let mut node_map = HashMap::new();
-
-        for task in &workflow.tasks {
-            let node = WorkflowNode {
-                id: task.id,
-                name: task.description.clone(),
-                status: TaskStatus::Pending,
-                agent: agents.get(&task.id).cloned(),
-            };
-            let idx = graph.add_node(node);
-            node_map.insert(task.id, idx);
-        }
-
-        for subtask in &workflow.subtasks {
-            if let Some(&from) = node_map.get(&subtask.parent_id) {
-                for dep_id in &subtask.dependencies {
-                    if let Some(&to) = node_map.get(dep_id) {
-                        graph.add_edge(to, from, ());
-                    }
-                }
-            }
-        }
-
-        let state = WorkflowState {
-            workflow,
-            graph,
-            node_map,
-            outputs: HashMap::new(),
-        };
-
-        let mut workflows = self.workflows.write().await;
-        workflows.insert(state.workflow.id, state);
-        Ok(())
+    pub async fn register(&self, workflow: Workflow) -> Result<(), KairoError> {
+        self.store.create(workflow).await
     }
 
-    #[instrument(skip(self))]
-    pub async fn execute(&self, workflow_id: Uuid, ctx: Context) -> Result<WorkflowResult, KairoError> {
-        let mut workflows = self.workflows.write().await;
-        let state = workflows.get_mut(&workflow_id)
+    #[instrument(skip(self, ctx, runner))]
+    pub async fn execute(
+        &self,
+        workflow_id: Uuid,
+        ctx: Context,
+        runner: Arc<dyn TaskRunner>,
+    ) -> Result<WorkflowResult, KairoError> {
+        let record = self
+            .store
+            .get(workflow_id)
+            .await?
             .ok_or_else(|| KairoError::Workflow(format!("Workflow {} not found", workflow_id)))?;
-
-        let mut topo = Topo::new(&state.graph);
-        let mut execution_order = Vec::new();
-
-        while let Some(node_idx) = topo.next(&state.graph) {
-            execution_order.push(node_idx);
-        }
-
-        for node_idx in execution_order {
-            let node = &mut state.graph[node_idx];
-            node.status = TaskStatus::InProgress;
-            debug!(task_id = %node.id, name = %node.name, "executing workflow task");
-
-            if let Some(agent) = &node.agent {
-                let mut task_ctx = ctx.clone();
-                task_ctx.workflow_id = Some(workflow_id);
-
-                let result = agent.run(task_ctx).await;
-                match result {
-                    Ok(agent_result) => {
-                        state.outputs.insert(node.id, agent_result.output.clone());
-                        node.status = TaskStatus::Completed;
-                        info!(task_id = %node.id, "task completed");
-                    }
-                    Err(e) => {
-                        node.status = TaskStatus::Failed;
-                        error!(task_id = %node.id, error = %e, "task failed");
-                        state.workflow.status = WorkflowStatus::Failed;
-                        return Ok(WorkflowResult {
-                            workflow_id,
-                            outputs: state.outputs.clone(),
-                            status: WorkflowStatus::Failed,
-                        });
-                    }
-                }
-            } else {
-                node.status = TaskStatus::Completed;
-                state.outputs.insert(node.id, "No agent assigned".into());
-            }
-        }
-
-        state.workflow.status = WorkflowStatus::Completed;
-        Ok(WorkflowResult {
-            workflow_id,
-            outputs: state.outputs.clone(),
-            status: WorkflowStatus::Completed,
-        })
+        let dag = DagBuilder::build(&record.workflow)?;
+        let executor = Executor::new(self.store.clone(), runner);
+        executor.execute(workflow_id, dag, ctx).await
     }
 
     pub async fn get_status(&self, workflow_id: Uuid) -> Option<WorkflowStatus> {
-        let workflows = self.workflows.read().await;
-        workflows.get(&workflow_id).map(|s| s.workflow.status.clone())
+        self.store
+            .get(workflow_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|r| r.overall_status)
     }
 
     pub async fn get_outputs(&self, workflow_id: Uuid) -> Option<HashMap<Uuid, String>> {
-        let workflows = self.workflows.read().await;
-        workflows.get(&workflow_id).map(|s| s.outputs.clone())
+        self.store
+            .get(workflow_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|r| {
+                let mut outputs = HashMap::new();
+                for (id, state) in r.statuses {
+                    if let Some(output) = state.output {
+                        outputs.insert(id, output);
+                    }
+                }
+                outputs
+            })
     }
 }
 
@@ -159,7 +92,7 @@ impl Default for WorkflowEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kairo_core::{Task, TaskStatus, Workflow, WorkflowStatus};
+    use kairo_core::{Workflow, WorkflowStatus};
 
     #[tokio::test]
     async fn test_workflow_engine_register() {
@@ -172,7 +105,7 @@ mod tests {
             status: WorkflowStatus::Draft,
         };
 
-        let result = engine.register(workflow, HashMap::new()).await;
+        let result = engine.register(workflow).await;
         assert!(result.is_ok());
     }
 
@@ -188,7 +121,7 @@ mod tests {
             status: WorkflowStatus::Draft,
         };
 
-        engine.register(workflow, HashMap::new()).await.unwrap();
+        engine.register(workflow).await.unwrap();
         let status = engine.get_status(id).await;
         assert_eq!(status, Some(WorkflowStatus::Draft));
     }

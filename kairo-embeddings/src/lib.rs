@@ -269,6 +269,7 @@ struct EmbeddingRequest {
 
 /// OpenAI-compatible embedding response.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct EmbeddingResponse {
     data: Vec<EmbeddingDataItem>,
     model: String,
@@ -276,6 +277,7 @@ struct EmbeddingResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct EmbeddingDataItem {
     embedding: Vec<f32>,
     index: usize,
@@ -283,6 +285,7 @@ struct EmbeddingDataItem {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct EmbeddingUsage {
     prompt_tokens: u32,
     total_tokens: u32,

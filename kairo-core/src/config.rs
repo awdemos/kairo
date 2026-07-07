@@ -2,23 +2,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct KairoConfig {
     pub providers: ProviderConfig,
     pub api: ApiConfig,
     pub telemetry: TelemetryConfig,
     pub tools: ToolConfig,
-}
-
-impl Default for KairoConfig {
-    fn default() -> Self {
-        Self {
-            providers: ProviderConfig::default(),
-            api: ApiConfig::default(),
-            telemetry: TelemetryConfig::default(),
-            tools: ToolConfig::default(),
-        }
-    }
 }
 
 impl KairoConfig {
@@ -210,13 +199,14 @@ impl Default for ToolConfig {
 
 impl ToolConfig {
     pub fn from_env() -> Self {
-        let mut defaults = Self::default();
-        defaults.serpapi_key = std::env::var("SERPAPI_KEY").ok();
-        defaults.brave_api_key = std::env::var("BRAVE_API_KEY").ok();
-        defaults.sandbox_enabled = std::env::var("KAIRO_SANDBOX_ENABLED")
-            .ok()
-            .map(|s| s == "true" || s == "1")
-            .unwrap_or(false);
-        defaults
+        Self {
+            serpapi_key: std::env::var("SERPAPI_KEY").ok(),
+            brave_api_key: std::env::var("BRAVE_API_KEY").ok(),
+            sandbox_enabled: std::env::var("KAIRO_SANDBOX_ENABLED")
+                .ok()
+                .map(|s| s == "true" || s == "1")
+                .unwrap_or(false),
+            ..Self::default()
+        }
     }
 }

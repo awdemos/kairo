@@ -3,6 +3,8 @@ pub mod config;
 pub mod context;
 pub mod error;
 pub mod model;
+pub mod model_id;
+pub mod provider_error;
 pub mod task;
 pub mod traits;
 pub mod types;
@@ -12,6 +14,17 @@ pub use agent::{Agent, AgentConfig};
 pub use config::{
     ApiConfig, KairoConfig, ProviderConfig, TelemetryConfig, ToolConfig,
 };
+pub use context::Context;
+pub use error::KairoError;
+pub use model::ModelId;
+pub use provider_error::{ProviderError, ProviderIdentity};
+pub use task::TaskType;
+pub use traits::{Connector, Executable, Provider, Routable, Tool};
+pub use types::{
+    Action, CompletionOptions, CompletionResponse, CostEstimate, Data, Event, LatencyTarget,
+    Message, Output, Role, TaskVector, TokenUsage, ToolInput, ToolOutput,
+};
+pub use workflow::{Subtask, Task, TaskStatus, Workflow, WorkflowStatus};
 
 #[cfg(test)]
 mod tests {
@@ -20,7 +33,7 @@ mod tests {
 
     #[test]
     fn test_model_id_variants() {
-        let models = vec![
+        let models = [
             ModelId::Gpt4o,
             ModelId::Claude3_5Sonnet,
             ModelId::Gemini2_0Flash,
@@ -33,7 +46,7 @@ mod tests {
 
     #[test]
     fn test_task_type_variants() {
-        let tasks = vec![
+        let tasks = [
             TaskType::Research,
             TaskType::CodeGeneration,
             TaskType::Custom("special".into()),
@@ -44,8 +57,13 @@ mod tests {
 
     #[test]
     fn test_kairo_error_display() {
-        let err = KairoError::Provider("test error".into());
-        assert_eq!(err.to_string(), "Provider error: test error");
+        let err = KairoError::Provider(
+            ProviderError::new("openai", "gpt-4o").with_message("test error"),
+        );
+        assert_eq!(
+            err.to_string(),
+            "Provider error: openai (gpt-4o) [no status]: test error"
+        );
     }
 
     #[test]
@@ -79,13 +97,3 @@ mod tests {
         assert_eq!(usage.total_tokens, 30);
     }
 }
-pub use context::Context;
-pub use error::KairoError;
-pub use model::ModelId;
-pub use task::TaskType;
-pub use traits::{Connector, Executable, Provider, Routable, Tool};
-pub use types::{
-    Action, CompletionOptions, CompletionResponse, CostEstimate, Data, Event, LatencyTarget,
-    Message, Output, Role, TaskVector, TokenUsage, ToolInput, ToolOutput,
-};
-pub use workflow::{Subtask, Task, TaskStatus, Workflow, WorkflowStatus};

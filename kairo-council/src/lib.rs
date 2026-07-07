@@ -66,7 +66,7 @@ impl ModelCouncil {
         scores.insert(score.model.clone(), score);
     }
 
-    pub async fn route(&self, task: &TaskType, _options: &CompletionOptions) -> Result<RoutingDecision, KairoError> {
+    pub async fn route(&self, _task: &TaskType, _options: &CompletionOptions) -> Result<RoutingDecision, KairoError> {
         let scores = self.scores.read().await;
         let candidates: Vec<_> = scores.values().collect();
 
