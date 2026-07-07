@@ -1,15 +1,17 @@
 use thiserror::Error;
 
+use crate::provider_error::ProviderError;
+
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum KairoError {
     #[error("Provider error: {0}")]
-    Provider(String),
+    Provider(ProviderError),
 
-    #[error("Tool error: {0}")]
-    Tool(String),
+    #[error("Tool error: {name}: {message}")]
+    Tool { name: String, message: String },
 
-    #[error("Connector error: {0}")]
-    Connector(String),
+    #[error("Connector error: {name}: {message}")]
+    Connector { name: String, message: String },
 
     #[error("Validation error: {0}")]
     Validation(String),

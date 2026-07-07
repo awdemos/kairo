@@ -22,7 +22,10 @@ impl HttpConnector {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout_secs))
             .build()
-            .map_err(|e| KairoError::Connector(format!("Failed to build HTTP client: {}", e)))?;
+            .map_err(|e| KairoError::Connector {
+                name: "http".to_string(),
+                message: format!("Failed to build HTTP client: {}", e),
+            })?;
 
         Ok(Self { client, config })
     }
@@ -47,17 +50,23 @@ impl Connector for HttpConnector {
             debug!(url = %url, "sending HTTP connector request");
 
             let response = request.send().await
-                .map_err(|e| KairoError::Connector(format!("HTTP request failed: {}", e)))?;
+                .map_err(|e| KairoError::Connector {
+                    name: "http".to_string(),
+                    message: format!("HTTP request failed: {}", e),
+                })?;
 
             if !response.status().is_success() {
-                return Err(KairoError::Connector(format!(
-                    "HTTP error: {}",
-                    response.status()
-                )));
+                return Err(KairoError::Connector {
+                    name: "http".to_string(),
+                    message: format!("HTTP error: {}", response.status()),
+                });
             }
 
             let content = response.json().await
-                .map_err(|e| KairoError::Connector(format!("Failed to parse response: {}", e)))?;
+                .map_err(|e| KairoError::Connector {
+                    name: "http".to_string(),
+                    message: format!("Failed to parse response: {}", e),
+                })?;
 
             Ok(Data { content })
         })
@@ -110,7 +119,10 @@ impl Connector for FileConnector {
             match operation {
                 "read" => {
                     let content = tokio::fs::read_to_string(path).await
-                        .map_err(|e| KairoError::Connector(format!("File read failed: {}", e)))?;
+                        .map_err(|e| KairoError::Connector {
+                            name: "file".to_string(),
+                            message: format!("File read failed: {}", e),
+                        })?;
                     Ok(Data {
                         content: serde_json::json!({ "content": content }),
                     })
@@ -120,12 +132,18 @@ impl Connector for FileConnector {
                         .and_then(|v| v.as_str())
                         .unwrap_or("");
                     tokio::fs::write(path, content).await
-                        .map_err(|e| KairoError::Connector(format!("File write failed: {}", e)))?;
+                        .map_err(|e| KairoError::Connector {
+                            name: "file".to_string(),
+                            message: format!("File write failed: {}", e),
+                        })?;
                     Ok(Data {
                         content: serde_json::json!({ "written": true }),
                     })
                 }
-                _ => Err(KairoError::Connector(format!("Unknown file operation: {}", operation))),
+                _ => Err(KairoError::Connector {
+                    name: "file".to_string(),
+                    message: format!("Unknown file operation: {}", operation),
+                }),
             }
         })
     }

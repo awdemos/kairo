@@ -82,6 +82,21 @@ async fn health_check() -> &'static str {
     "ok"
 }
 
+fn into_response(err: KairoError) -> (StatusCode, Json<ErrorResponse>) {
+    let status = match &err {
+        KairoError::Provider(p) if p.status == Some(401) => StatusCode::UNAUTHORIZED,
+        KairoError::Provider(p) if p.status == Some(429) => StatusCode::TOO_MANY_REQUESTS,
+        KairoError::Provider(p) if p.retryable => StatusCode::SERVICE_UNAVAILABLE,
+        KairoError::RateLimited => StatusCode::TOO_MANY_REQUESTS,
+        KairoError::Unauthorized => StatusCode::UNAUTHORIZED,
+        KairoError::NotFound(_) => StatusCode::NOT_FOUND,
+        KairoError::Validation(_) => StatusCode::BAD_REQUEST,
+        _ => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    error!(error = %err, "request failed");
+    (status, Json(ErrorResponse { error: err.to_string() }))
+}
+
 async fn chat_completions(
     State(state): State<ApiState>,
     Json(req): Json<ChatRequest>,
@@ -109,12 +124,7 @@ async fn chat_completions(
         }))
     })?;
 
-    let result = agent.run(ctx).await.map_err(|e| {
-        error!(error = %e, "agent execution failed");
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
-            error: e.to_string(),
-        }))
-    })?;
+    let result = agent.run(ctx).await.map_err(into_response)?;
 
     Ok(Json(ChatResponse {
         id: Uuid::new_v4().to_string(),
@@ -137,11 +147,7 @@ async fn create_workflow(
         status: kairo_core::WorkflowStatus::Draft,
     };
 
-    state.engine.register(workflow, HashMap::new()).await.map_err(|e| {
-        (StatusCode::INTERNAL_SERVER_ERROR, Json(ErrorResponse {
-            error: e.to_string(),
-        }))
-    })?;
+    state.engine.register(workflow, HashMap::new()).await.map_err(into_response)?;
 
     Ok(Json(WorkflowResponse {
         workflow_id: workflow_id.to_string(),
@@ -181,4 +187,22 @@ pub async fn run_server(state: ApiState, port: u16) -> Result<(), KairoError> {
         .map_err(|e| KairoError::Internal(format!("Server error: {}", e)))?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kairo_core::ProviderError;
+
+    #[test]
+    fn provider_429_maps_to_too_many_requests() {
+        let err = KairoError::Provider(
+            ProviderError::new("openai", "gpt-4o")
+                .with_status(429)
+                .with_retryable(true)
+                .with_message("rate limited"),
+        );
+        let (status, _) = into_response(err);
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    }
 }

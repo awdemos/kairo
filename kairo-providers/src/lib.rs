@@ -5,7 +5,8 @@ use std::time::Duration;
 use tracing::{debug, error, instrument};
 
 use kairo_core::{
-    CompletionOptions, CompletionResponse, KairoError, Message, ModelId, Provider, TokenUsage,
+    CompletionOptions, CompletionResponse, KairoError, Message, ModelId, Provider, ProviderError,
+    TokenUsage,
 };
 
 /// OpenAI-compatible provider implementation.
@@ -118,7 +119,12 @@ impl Provider for OpenAiProvider {
         headers.insert(
             header::AUTHORIZATION,
             HeaderValue::from_str(&format!("Bearer {}", self.api_key))
-                .map_err(|e| KairoError::Provider(format!("Invalid API key: {}", e)))?,
+                .map_err(|e| {
+                    KairoError::Provider(
+                        ProviderError::new("openai", &self.model)
+                            .with_message(format!("Invalid API key: {}", e)),
+                    )
+                })?,
         );
         headers.insert(
             header::CONTENT_TYPE,
@@ -134,7 +140,9 @@ impl Provider for OpenAiProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| KairoError::Provider(format!("Request failed: {}", e)))?;
+            .map_err(|e| KairoError::Provider(
+                ProviderError::new("openai", &self.model).with_message(format!("Request failed: {}", e))
+            ))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -143,22 +151,28 @@ impl Provider for OpenAiProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             error!(status = %status, error = %text, "OpenAI API error");
-            return Err(KairoError::Provider(format!(
-                "API error {}: {}",
-                status, text
-            )));
+            return Err(KairoError::Provider(
+                ProviderError::new("openai", &self.model)
+                    .with_status(status.as_u16())
+                    .with_retryable(is_retryable(status.as_u16()))
+                    .with_message(text),
+            ));
         }
 
         let openai_response: OpenAiResponse = response
             .json()
             .await
-            .map_err(|e| KairoError::Provider(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| KairoError::Provider(
+                ProviderError::new("openai", &self.model).with_message(format!("Failed to parse response: {}", e))
+            ))?;
 
         let choice = openai_response
             .choices
             .into_iter()
             .next()
-            .ok_or_else(|| KairoError::Provider("No choices in response".into()))?;
+            .ok_or_else(|| KairoError::Provider(
+                ProviderError::new("openai", &self.model).with_message("No choices in response")
+            ))?;
 
         Ok(CompletionResponse {
             content: choice.message.content,
@@ -275,7 +289,9 @@ impl Provider for AnthropicProvider {
         headers.insert(
             "x-api-key",
             HeaderValue::from_str(&self.api_key)
-                .map_err(|e| KairoError::Provider(format!("Invalid API key: {}", e)))?,
+                .map_err(|e| KairoError::Provider(
+                    ProviderError::new("anthropic", &self.model).with_message(format!("Invalid API key: {}", e))
+                ))?,
         );
         headers.insert(
             header::CONTENT_TYPE,
@@ -295,7 +311,9 @@ impl Provider for AnthropicProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| KairoError::Provider(format!("Request failed: {}", e)))?;
+            .map_err(|e| KairoError::Provider(
+                ProviderError::new("anthropic", &self.model).with_message(format!("Request failed: {}", e))
+            ))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -304,16 +322,20 @@ impl Provider for AnthropicProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             error!(status = %status, error = %text, "Anthropic API error");
-            return Err(KairoError::Provider(format!(
-                "API error {}: {}",
-                status, text
-            )));
+            return Err(KairoError::Provider(
+                ProviderError::new("anthropic", &self.model)
+                    .with_status(status.as_u16())
+                    .with_retryable(is_retryable(status.as_u16()))
+                    .with_message(text),
+            ));
         }
 
         let anthropic_response: AnthropicResponse = response
             .json()
             .await
-            .map_err(|e| KairoError::Provider(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| KairoError::Provider(
+                ProviderError::new("anthropic", &self.model).with_message(format!("Failed to parse response: {}", e))
+            ))?;
 
         let content_text = anthropic_response
             .content
@@ -461,7 +483,9 @@ impl Provider for GeminiProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| KairoError::Provider(format!("Request failed: {}", e)))?;
+            .map_err(|e| KairoError::Provider(
+                ProviderError::new("gemini", &self.model).with_message(format!("Request failed: {}", e))
+            ))?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -470,22 +494,28 @@ impl Provider for GeminiProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             error!(status = %status, error = %text, "Gemini API error");
-            return Err(KairoError::Provider(format!(
-                "API error {}: {}",
-                status, text
-            )));
+            return Err(KairoError::Provider(
+                ProviderError::new("gemini", &self.model)
+                    .with_status(status.as_u16())
+                    .with_retryable(is_retryable(status.as_u16()))
+                    .with_message(text),
+            ));
         }
 
         let gemini_response: GeminiResponse = response
             .json()
             .await
-            .map_err(|e| KairoError::Provider(format!("Failed to parse response: {}", e)))?;
+            .map_err(|e| KairoError::Provider(
+                ProviderError::new("gemini", &self.model).with_message(format!("Failed to parse response: {}", e))
+            ))?;
 
         let candidate = gemini_response
             .candidates
             .into_iter()
             .next()
-            .ok_or_else(|| KairoError::Provider("No candidates in response".into()))?;
+            .ok_or_else(|| KairoError::Provider(
+                ProviderError::new("gemini", &self.model).with_message("No candidates in response")
+            ))?;
 
         let content_text = candidate
             .content
@@ -513,6 +543,10 @@ impl Provider for GeminiProvider {
         })
         })
     }
+}
+
+fn is_retryable(status: u16) -> bool {
+    matches!(status, 429 | 500 | 502 | 503)
 }
 
 /// Factory function to create a provider from a ModelId and API key.
