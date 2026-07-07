@@ -188,3 +188,31 @@ impl Provider for OpenAiProvider {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use kairo_core::{CompletionOptions, Message, Role};
+
+    #[tokio::test]
+    async fn test_openai_provider_parses_successful_response() {
+        let mut server = mockito::Server::new_async().await;
+        let _m = server
+            .mock("POST", "/v1/chat/completions")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"choices":[{"message":{"role":"assistant","content":"hello"}}],"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7},"model":"gpt-4o"}"#)
+            .create_async()
+            .await;
+
+        let provider = OpenAiProvider::new("test-key", "gpt-4o").with_base_url(format!("{}/v1", server.url()));
+        let response = provider
+            .complete(vec![Message { role: Role::User, content: "hi".into(), name: None, timestamp: Utc::now() }], CompletionOptions::default())
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "hello");
+        assert_eq!(response.usage.total_tokens, 7);
+    }
+}
