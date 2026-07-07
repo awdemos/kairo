@@ -190,7 +190,10 @@ pub async fn run_server(state: ApiState, port: u16) -> Result<(), KairoError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::body::Body;
     use kairo_core::ProviderError;
+    use tokio::sync::RwLock;
+    use tower::ServiceExt;
 
     #[test]
     fn provider_429_maps_to_too_many_requests() {
@@ -202,5 +205,43 @@ mod tests {
         );
         let (status, _) = into_response(err);
         assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[tokio::test]
+    async fn test_health_check() {
+        let state = ApiState {
+            agents: Arc::new(RwLock::new(vec![])),
+            engine: Arc::new(WorkflowEngine::new()),
+            telemetry: kairo_telemetry::build_default(),
+        };
+        let app = app(state);
+        let response = app
+            .oneshot(axum::http::Request::builder().uri("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_chat_handler_returns_503_when_no_agents() {
+        let state = ApiState {
+            agents: Arc::new(RwLock::new(vec![])),
+            engine: Arc::new(WorkflowEngine::new()),
+            telemetry: kairo_telemetry::build_default(),
+        };
+        let app = app(state);
+        let body = serde_json::to_vec(&ChatRequest { messages: vec![], model: None, stream: None }).unwrap();
+        let response = app
+            .oneshot(
+                axum::http::Request::builder()
+                    .method("POST")
+                    .uri("/v1/chat/completions")
+                    .header("content-type", "application/json")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 }
