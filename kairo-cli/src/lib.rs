@@ -23,7 +23,7 @@ pub enum Commands {
     Chat {
         #[arg(short, long)]
         model: Option<String>,
-        #[arg(short, long)]
+        #[arg(long)]
         message: String,
     },
     Run {
