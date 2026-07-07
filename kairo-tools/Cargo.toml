@@ -24,3 +24,4 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }
+uuid = { workspace = true }
