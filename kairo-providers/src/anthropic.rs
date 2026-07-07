@@ -12,6 +12,7 @@ use kairo_core::{
 pub struct AnthropicProvider {
     pub(crate) client: reqwest::Client,
     pub(crate) api_key: String,
+    pub(crate) base_url: String,
     pub(crate) model: String,
 }
 
@@ -23,8 +24,14 @@ impl AnthropicProvider {
                 .build()
                 .expect("Failed to build HTTP client"),
             api_key: api_key.into(),
+            base_url: "https://api.anthropic.com/v1".to_string(),
             model: model.into(),
         }
+    }
+
+    pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
+        self.base_url = url.into();
+        self
     }
 }
 
@@ -128,7 +135,7 @@ impl Provider for AnthropicProvider {
 
             let response = self
                 .client
-                .post("https://api.anthropic.com/v1/messages")
+                .post(format!("{}/messages", self.base_url))
                 .headers(headers)
                 .json(&request)
                 .send()
@@ -176,5 +183,33 @@ impl Provider for AnthropicProvider {
                 finish_reason: anthropic_response.stop_reason.unwrap_or_default(),
             })
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use kairo_core::{CompletionOptions, Message, Role};
+
+    #[tokio::test]
+    async fn test_anthropic_provider_parses_successful_response() {
+        let mut server = mockito::Server::new_async().await;
+        let _m = server
+            .mock("POST", "/v1/messages")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"content":[{"type":"text","text":"hello"}],"usage":{"input_tokens":5,"output_tokens":2},"stop_reason":"end_turn","model":"claude-3-5-sonnet-20240620"}"#)
+            .create_async()
+            .await;
+
+        let provider = AnthropicProvider::new("test-key", "claude-3-5-sonnet-20240620").with_base_url(format!("{}/v1", server.url()));
+        let response = provider
+            .complete(vec![Message { role: Role::User, content: "hi".into(), name: None, timestamp: Utc::now() }], CompletionOptions::default())
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "hello");
+        assert_eq!(response.usage.total_tokens, 7);
     }
 }

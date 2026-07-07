@@ -12,6 +12,7 @@ use kairo_core::{
 pub struct GeminiProvider {
     pub(crate) client: reqwest::Client,
     pub(crate) api_key: String,
+    pub(crate) base_url: String,
     pub(crate) model: String,
 }
 
@@ -23,8 +24,14 @@ impl GeminiProvider {
                 .build()
                 .expect("Failed to build HTTP client"),
             api_key: api_key.into(),
+            base_url: "https://generativelanguage.googleapis.com/v1beta".to_string(),
             model: model.into(),
         }
+    }
+
+    pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
+        self.base_url = url.into();
+        self
     }
 }
 
@@ -122,8 +129,8 @@ impl Provider for GeminiProvider {
             debug!(model = %self.model, "sending Gemini completion request");
 
             let url = format!(
-                "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
-                self.model, self.api_key
+                "{}/models/{}:generateContent?key={}",
+                self.base_url, self.model, self.api_key
             );
 
             let response = self
@@ -192,5 +199,36 @@ impl Provider for GeminiProvider {
                 finish_reason: candidate.finish_reason.unwrap_or_default(),
             })
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use kairo_core::{CompletionOptions, Message, Role};
+
+    #[tokio::test]
+    async fn test_gemini_provider_parses_successful_response() {
+        let mut server = mockito::Server::new_async().await;
+        let _m = server
+            .mock(
+                "POST",
+                mockito::Matcher::Regex(r"^/v1beta/models/gemini-1\.5-flash:generateContent(\?.*)?$".to_string()),
+            )
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"candidates":[{"content":{"parts":[{"text":"hello"}],"role":"model"},"finish_reason":"STOP"}],"usage_metadata":{"prompt_token_count":5,"candidates_token_count":2,"total_token_count":7},"model_version":"gemini-1.5-flash"}"#)
+            .create_async()
+            .await;
+
+        let provider = GeminiProvider::new("test-key", "gemini-1.5-flash").with_base_url(format!("{}/v1beta", server.url()));
+        let response = provider
+            .complete(vec![Message { role: Role::User, content: "hi".into(), name: None, timestamp: Utc::now() }], CompletionOptions::default())
+            .await
+            .unwrap();
+
+        assert_eq!(response.content, "hello");
+        assert_eq!(response.usage.total_tokens, 7);
     }
 }
