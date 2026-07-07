@@ -210,3 +210,63 @@ impl ToolConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_provider_config_from_env() {
+        temp_env::with_vars(
+            [
+                ("OPENAI_API_KEY", Some("sk-openai")),
+                ("ANTHROPIC_API_KEY", Some("sk-anthropic")),
+            ],
+            || {
+                let config = ProviderConfig::from_env();
+                assert_eq!(config.openai_api_key, Some("sk-openai".into()));
+                assert_eq!(config.anthropic_api_key, Some("sk-anthropic".into()));
+            },
+        );
+    }
+
+    #[test]
+    fn test_api_config_from_env() {
+        temp_env::with_vars([("KAIRO_API_PORT", Some("8080"))], || {
+            let config = ApiConfig::from_env();
+            assert_eq!(config.port, 8080);
+        });
+    }
+
+    #[test]
+    fn test_kairo_config_from_env_uses_defaults() {
+        temp_env::with_vars_unset(
+            [
+                "OPENAI_API_KEY",
+                "ANTHROPIC_API_KEY",
+                "GEMINI_API_KEY",
+                "XAI_API_KEY",
+                "KAIRO_DEFAULT_MODEL",
+                "KAIRO_TIMEOUT",
+                "KAIRO_MAX_RETRIES",
+                "KAIRO_API_HOST",
+                "KAIRO_API_PORT",
+                "KAIRO_CORS_ORIGINS",
+                "KAIRO_REQUEST_TIMEOUT",
+                "RUST_LOG",
+                "KAIRO_METRICS_ENABLED",
+                "KAIRO_METRICS_PORT",
+                "OTEL_EXPORTER_OTLP_ENDPOINT",
+                "KAIRO_OTLP_ENABLED",
+                "SERPAPI_KEY",
+                "BRAVE_API_KEY",
+                "KAIRO_SANDBOX_ENABLED",
+            ],
+            || {
+                let config = KairoConfig::from_env();
+                assert_eq!(config.api.port, 3000);
+                assert_eq!(config.providers.default_model, "gpt-4o");
+            },
+        );
+    }
+}
