@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn parses_thought_action_tool_and_observation() {
         let text = "Thought: I need to search\nAction: web_search\nTool: web_search(query=rust)\nObservation: results";
-        let thought = ThoughtParser::default().parse(text).unwrap();
+        let thought = ThoughtParser.parse(text).unwrap();
         assert_eq!(thought.thought, "I need to search");
         assert_eq!(thought.action, Some("web_search".to_string()));
         assert_eq!(thought.tool_calls.len(), 1);
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn finish_action_has_no_tools() {
         let text = "Thought: done\nAction: finish";
-        let thought = ThoughtParser::default().parse(text).unwrap();
+        let thought = ThoughtParser.parse(text).unwrap();
         assert_eq!(thought.action, Some("finish".to_string()));
         assert!(thought.tool_calls.is_empty());
     }

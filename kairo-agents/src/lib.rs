@@ -92,6 +92,7 @@ impl ReActAgent {
     }
 }
 
+#[allow(dead_code)]
 pub struct SubAgent {
     parent_id: Uuid,
     agent: ReActAgent,

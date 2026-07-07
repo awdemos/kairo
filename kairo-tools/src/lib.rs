@@ -106,6 +106,7 @@ impl Tool for CalculatorTool {
 /// Requires `SERPAPI_KEY` or `BRAVE_API_KEY` environment variable
 /// for live search results. Falls back to a helpful message if
 /// no API key is configured.
+#[allow(dead_code)]
 pub struct WebSearchTool {
     client: reqwest::Client,
 }
@@ -115,6 +116,12 @@ impl WebSearchTool {
         Self {
             client: reqwest::Client::new(),
         }
+    }
+}
+
+impl Default for WebSearchTool {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

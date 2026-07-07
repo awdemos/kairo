@@ -62,6 +62,7 @@ struct OpenAiMessage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OpenAiResponse {
     choices: Vec<OpenAiChoice>,
     usage: OpenAiUsage,

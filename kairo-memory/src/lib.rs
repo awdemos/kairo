@@ -7,7 +7,7 @@ use tracing::{debug, instrument};
 use uuid::Uuid;
 
 use kairo_core::{KairoError, Message, Role};
-use kairo_embeddings::{cosine_similarity, normalize, Embedding, EmbeddingStore, InMemoryEmbeddingStore};
+use kairo_embeddings::{Embedding, EmbeddingStore, InMemoryEmbeddingStore};
 
 /// A memory entry representing a single interaction or observation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,18 +28,13 @@ pub struct MemoryMetadata {
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub enum MemoryType {
+    #[default]
     Episodic,
     Semantic,
     Procedural,
     Custom(String),
-}
-
-impl Default for MemoryType {
-    fn default() -> Self {
-        MemoryType::Episodic
-    }
 }
 
 /// Episodic memory stores the agent's personal experiences and interactions.

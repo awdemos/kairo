@@ -49,6 +49,7 @@ struct AnthropicMessage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct AnthropicResponse {
     content: Vec<AnthropicContent>,
     usage: AnthropicUsage,

@@ -35,7 +35,7 @@ impl ReActLoop {
             council,
             dispatcher,
             memory,
-            parser: ThoughtParser::default(),
+            parser: ThoughtParser,
             max_iterations,
             agent_id,
             temperature,

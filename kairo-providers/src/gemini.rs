@@ -57,6 +57,7 @@ struct GeminiGenerationConfig {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct GeminiResponse {
     candidates: Vec<GeminiCandidate>,
     usage_metadata: Option<GeminiUsage>,
@@ -70,6 +71,7 @@ struct GeminiCandidate {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct GeminiContentResponse {
     parts: Vec<GeminiPartResponse>,
     role: String,

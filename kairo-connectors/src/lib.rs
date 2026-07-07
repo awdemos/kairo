@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::pin::Pin;
-use std::future::Future;
-use tracing::{debug, instrument};
+use tracing::debug;
 
 use kairo_core::{Action, Connector, Data, KairoError};
 
@@ -32,44 +30,37 @@ impl HttpConnector {
 }
 
 impl Connector for HttpConnector {
-    fn invoke<'a>(&'a self, action: Action) -> Pin<Box<dyn Future<Output = Result<Data, KairoError>> + Send + 'a>> {
-        Box::pin(async move {
-            let url = format!("{}{}", self.config.base_url, action.operation);
+    async fn invoke(&self, action: Action) -> Result<Data, KairoError> {
+        let url = format!("{}{}", self.config.base_url, action.operation);
 
-            let mut request = self.client.request(
-                reqwest::Method::POST,
-                &url,
-            );
+        let mut request = self.client.request(reqwest::Method::POST, &url);
 
-            for (key, value) in &self.config.headers {
-                request = request.header(key, value);
-            }
+        for (key, value) in &self.config.headers {
+            request = request.header(key, value);
+        }
 
-            request = request.json(&action.parameters);
+        request = request.json(&action.parameters);
 
-            debug!(url = %url, "sending HTTP connector request");
+        debug!(url = %url, "sending HTTP connector request");
 
-            let response = request.send().await
-                .map_err(|e| KairoError::Connector {
-                    name: "http".to_string(),
-                    message: format!("HTTP request failed: {}", e),
-                })?;
+        let response = request.send().await.map_err(|e| KairoError::Connector {
+            name: "http".to_string(),
+            message: format!("HTTP request failed: {}", e),
+        })?;
 
-            if !response.status().is_success() {
-                return Err(KairoError::Connector {
-                    name: "http".to_string(),
-                    message: format!("HTTP error: {}", response.status()),
-                });
-            }
+        if !response.status().is_success() {
+            return Err(KairoError::Connector {
+                name: "http".to_string(),
+                message: format!("HTTP error: {}", response.status()),
+            });
+        }
 
-            let content = response.json().await
-                .map_err(|e| KairoError::Connector {
-                    name: "http".to_string(),
-                    message: format!("Failed to parse response: {}", e),
-                })?;
+        let content = response.json().await.map_err(|e| KairoError::Connector {
+            name: "http".to_string(),
+            message: format!("Failed to parse response: {}", e),
+        })?;
 
-            Ok(Data { content })
-        })
+        Ok(Data { content })
     }
 }
 
@@ -86,17 +77,15 @@ impl DatabaseConnector {
 }
 
 impl Connector for DatabaseConnector {
-    fn invoke<'a>(&'a self, action: Action) -> Pin<Box<dyn Future<Output = Result<Data, KairoError>> + Send + 'a>> {
-        Box::pin(async move {
-            debug!(operation = %action.operation, "database connector");
-            Ok(Data {
-                content: serde_json::json!({
-                    "status": "ok",
-                    "operation": action.operation,
-                    "connection": self.connection_string.split('@').last().unwrap_or("unknown"),
-                    "note": "Database connector requires sqlx or tokio-postgres for full implementation"
-                }),
-            })
+    async fn invoke(&self, action: Action) -> Result<Data, KairoError> {
+        debug!(operation = %action.operation, "database connector");
+        Ok(Data {
+            content: serde_json::json!({
+                "status": "ok",
+                "operation": action.operation,
+                "connection": self.connection_string.split('@').next_back().unwrap_or("unknown"),
+                "note": "Database connector requires sqlx or tokio-postgres for full implementation"
+            }),
         })
     }
 }
@@ -104,48 +93,54 @@ impl Connector for DatabaseConnector {
 pub struct FileConnector;
 
 impl Connector for FileConnector {
-    fn invoke<'a>(&'a self, action: Action) -> Pin<Box<dyn Future<Output = Result<Data, KairoError>> + Send + 'a>> {
-        Box::pin(async move {
-            let operation = action.parameters.get("operation")
-                .and_then(|v| v.as_str())
-                .unwrap_or("read");
+    async fn invoke(&self, action: Action) -> Result<Data, KairoError> {
+        let operation = action
+            .parameters
+            .get("operation")
+            .and_then(|v| v.as_str())
+            .unwrap_or("read");
 
-            let path = action.parameters.get("path")
-                .and_then(|v| v.as_str())
-                .unwrap_or(".");
+        let path = action
+            .parameters
+            .get("path")
+            .and_then(|v| v.as_str())
+            .unwrap_or(".");
 
-            debug!(operation = %operation, path = %path, "file connector");
+        debug!(operation = %operation, path = %path, "file connector");
 
-            match operation {
-                "read" => {
-                    let content = tokio::fs::read_to_string(path).await
-                        .map_err(|e| KairoError::Connector {
-                            name: "file".to_string(),
-                            message: format!("File read failed: {}", e),
-                        })?;
-                    Ok(Data {
-                        content: serde_json::json!({ "content": content }),
-                    })
-                }
-                "write" => {
-                    let content = action.parameters.get("content")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
-                    tokio::fs::write(path, content).await
-                        .map_err(|e| KairoError::Connector {
-                            name: "file".to_string(),
-                            message: format!("File write failed: {}", e),
-                        })?;
-                    Ok(Data {
-                        content: serde_json::json!({ "written": true }),
-                    })
-                }
-                _ => Err(KairoError::Connector {
-                    name: "file".to_string(),
-                    message: format!("Unknown file operation: {}", operation),
-                }),
+        match operation {
+            "read" => {
+                let content = tokio::fs::read_to_string(path).await.map_err(|e| {
+                    KairoError::Connector {
+                        name: "file".to_string(),
+                        message: format!("File read failed: {}", e),
+                    }
+                })?;
+                Ok(Data {
+                    content: serde_json::json!({ "content": content }),
+                })
             }
-        })
+            "write" => {
+                let content = action
+                    .parameters
+                    .get("content")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                tokio::fs::write(path, content).await.map_err(|e| {
+                    KairoError::Connector {
+                        name: "file".to_string(),
+                        message: format!("File write failed: {}", e),
+                    }
+                })?;
+                Ok(Data {
+                    content: serde_json::json!({ "written": true }),
+                })
+            }
+            _ => Err(KairoError::Connector {
+                name: "file".to_string(),
+                message: format!("Unknown file operation: {}", operation),
+            }),
+        }
     }
 }
 
