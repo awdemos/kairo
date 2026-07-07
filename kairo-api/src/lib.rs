@@ -15,12 +15,13 @@ use uuid::Uuid;
 use kairo_core::{Context, KairoError, Message, Role, Workflow};
 use kairo_agents::ReActAgent;
 use kairo_orchestrator::{WorkflowEngine, WorkflowResult};
-use kairo_telemetry::init as init_telemetry;
+use kairo_telemetry::{Telemetry, init as init_telemetry};
 
 #[derive(Clone)]
 pub struct ApiState {
     pub agents: Arc<tokio::sync::RwLock<Vec<ReActAgent>>>,
     pub engine: Arc<WorkflowEngine>,
+    pub telemetry: Arc<dyn Telemetry>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -123,6 +124,8 @@ async fn chat_completions(
     })?;
 
     let result = agent.run(ctx).await.map_err(into_response)?;
+
+    state.telemetry.counter("api_chat_completions", 1);
 
     Ok(Json(ChatResponse {
         id: Uuid::new_v4().to_string(),

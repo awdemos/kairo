@@ -161,9 +161,11 @@ pub async fn run(cli: Cli) -> Result<(), KairoError> {
             let react_agent = ReActAgent::new(agent, memory, tools, council);
             let agents = Arc::new(tokio::sync::RwLock::new(vec![react_agent]));
 
+            let telemetry = kairo_telemetry::build_default();
             let state = ApiState {
                 agents,
                 engine: Arc::new(kairo_orchestrator::WorkflowEngine::new()),
+                telemetry,
             };
 
             println!("Kairo API server running on http://0.0.0.0:{}", port);

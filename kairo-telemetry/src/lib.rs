@@ -16,11 +16,14 @@
 //! ```
 
 use std::borrow::Cow;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 pub use metrics;
 pub use tracing;
+
+pub mod interface;
+pub use interface::{NoOpTelemetry, Telemetry, TestTelemetry};
 
 #[derive(Debug, thiserror::Error)]
 pub enum TelemetryError {
@@ -40,6 +43,10 @@ impl Drop for TelemetryGuard {
     fn drop(&mut self) {
         opentelemetry::global::shutdown_tracer_provider();
     }
+}
+
+pub fn build_default() -> Arc<dyn Telemetry> {
+    Arc::new(NoOpTelemetry)
 }
 
 pub fn init() -> Result<TelemetryGuard> {
