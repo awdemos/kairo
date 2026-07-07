@@ -148,3 +148,114 @@ Use format: Thought: <your reasoning>\nAction: <tool_name> or finish\nTool: <too
             .to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::future::Future;
+    use std::pin::Pin;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    use kairo_core::{
+        CompletionOptions, CompletionResponse, Context, KairoError, Message, ModelId, Provider,
+        TokenUsage, Tool, ToolInput, ToolOutput,
+    };
+    use kairo_council::{CapabilityScore, ModelCouncil};
+    use kairo_memory::HybridMemory;
+    use kairo_tools::ToolRegistry;
+    use uuid::Uuid;
+
+    use super::ReActLoop;
+    use crate::tool_dispatcher::ToolDispatcher;
+
+    struct FakeProvider {
+        responses: Vec<String>,
+        calls: AtomicUsize,
+    }
+
+    impl Provider for FakeProvider {
+        fn complete<'a>(
+            &'a self,
+            _messages: Vec<Message>,
+            _options: CompletionOptions,
+        ) -> Pin<Box<dyn Future<Output = Result<CompletionResponse, KairoError>> + Send + 'a>> {
+            let idx = self.calls.fetch_add(1, Ordering::SeqCst);
+            let content = self.responses.get(idx).cloned().unwrap_or_default();
+            Box::pin(async move {
+                Ok(CompletionResponse {
+                    content,
+                    usage: TokenUsage {
+                        prompt_tokens: 0,
+                        completion_tokens: 0,
+                        total_tokens: 0,
+                    },
+                    model: ModelId::Gpt4o,
+                    finish_reason: "stop".into(),
+                })
+            })
+        }
+    }
+
+    struct FakeTool;
+
+    impl Tool for FakeTool {
+        fn name(&self) -> &str {
+            "fake_tool"
+        }
+
+        fn description(&self) -> &str {
+            "fake"
+        }
+
+        fn execute<'a>(
+            &'a self,
+            _input: ToolInput,
+        ) -> Pin<Box<dyn Future<Output = Result<ToolOutput, KairoError>> + Send + 'a>> {
+            Box::pin(async move {
+                Ok(ToolOutput {
+                    success: true,
+                    result: serde_json::json!({"value": 42}),
+                })
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn test_react_loop_finishes_on_action_finish() {
+        let provider = Arc::new(FakeProvider {
+            responses: vec!["Thought: done\nAction: finish".into()],
+            calls: AtomicUsize::new(0),
+        });
+        let council = Arc::new(ModelCouncil::new());
+        council
+            .register_provider(ModelId::Gpt4o, provider.clone())
+            .await;
+        council
+            .register_model(CapabilityScore {
+                model: ModelId::Gpt4o,
+                score: 0.95,
+                latency_ms: 1,
+                cost_per_1k: 0.0,
+            })
+            .await;
+
+        let registry = ToolRegistry::new();
+        registry.register(Arc::new(FakeTool)).await;
+        let dispatcher = ToolDispatcher::new(registry);
+        let memory = Arc::new(HybridMemory::new());
+
+        let loop_ = ReActLoop::new(
+            council,
+            dispatcher,
+            memory,
+            10,
+            "test-agent".into(),
+            0.0,
+            100,
+        );
+
+        let result = loop_.run(Context::new(Uuid::new_v4())).await.unwrap();
+        assert_eq!(result.output, "done");
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+    }
+}

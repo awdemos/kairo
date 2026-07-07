@@ -44,6 +44,7 @@ impl Clone for RoutingDecision {
 pub struct ModelCouncil {
     scores: RwLock<HashMap<ModelId, CapabilityScore>>,
     api_keys: HashMap<ModelId, String>,
+    providers: RwLock<HashMap<ModelId, Arc<dyn Provider>>>,
 }
 
 impl ModelCouncil {
@@ -51,6 +52,7 @@ impl ModelCouncil {
         Self {
             scores: RwLock::new(HashMap::new()),
             api_keys: HashMap::new(),
+            providers: RwLock::new(HashMap::new()),
         }
     }
 
@@ -66,6 +68,11 @@ impl ModelCouncil {
         scores.insert(score.model.clone(), score);
     }
 
+    pub async fn register_provider(&self, model: ModelId, provider: Arc<dyn Provider>) {
+        let mut providers = self.providers.write().await;
+        providers.insert(model, provider);
+    }
+
     pub async fn route(&self, _task: &TaskType, _options: &CompletionOptions) -> Result<RoutingDecision, KairoError> {
         let scores = self.scores.read().await;
         let candidates: Vec<_> = scores.values().collect();
@@ -79,10 +86,14 @@ impl ModelCouncil {
             .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
             .ok_or_else(|| KairoError::Routing("No suitable model found".into()))?;
 
-        let api_key = self.api_keys.get(&best.model)
-            .ok_or_else(|| KairoError::Routing(format!("No API key for model {:?}", best.model)))?;
-
-        let provider = create_provider(&best.model, api_key)?;
+        let providers = self.providers.read().await;
+        let provider = if let Some(provider) = providers.get(&best.model) {
+            provider.clone()
+        } else {
+            let api_key = self.api_keys.get(&best.model)
+                .ok_or_else(|| KairoError::Routing(format!("No API key for model {:?}", best.model)))?;
+            create_provider(&best.model, api_key)?
+        };
 
         Ok(RoutingDecision {
             model: best.model.clone(),
