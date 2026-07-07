@@ -360,4 +360,42 @@ mod tests {
         assert!(tools.contains(&"filesystem".to_string()));
         assert!(tools.contains(&"code_execution".to_string()));
     }
+
+    #[tokio::test]
+    async fn test_filesystem_tool_reads_file() {
+        struct TempFileGuard(std::path::PathBuf);
+
+        impl Drop for TempFileGuard {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("kairo-test-{}", uuid::Uuid::new_v4()));
+        tokio::fs::write(&path, "hello file").await.unwrap();
+        let _guard = TempFileGuard(path.clone());
+
+        let tool = FileSystemTool;
+        let input = ToolInput {
+            arguments: serde_json::json!({"operation": "read", "path": path.to_str().unwrap()}),
+        };
+        let output = tool.execute(input).await.unwrap();
+        assert!(output.success);
+        assert_eq!(output.result.get("content").unwrap().as_str().unwrap(), "hello file");
+    }
+
+    #[tokio::test]
+    async fn test_code_execution_tool_returns_sandbox_placeholder() {
+        let tool = CodeExecutionTool;
+        let input = ToolInput {
+            arguments: serde_json::json!({"language": "python", "code": "print(2+2)"}),
+        };
+        let output = tool.execute(input).await.unwrap();
+        assert!(output.success);
+        assert_eq!(output.result.get("language").unwrap().as_str().unwrap(), "python");
+        assert_eq!(output.result.get("code").unwrap().as_str().unwrap(), "print(2+2)");
+        let result_output = output.result.get("output").unwrap().as_str().unwrap();
+        assert!(result_output.contains("kairo-sandbox"));
+    }
 }
