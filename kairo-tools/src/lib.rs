@@ -6,14 +6,15 @@ use tracing::{debug, instrument, warn};
 use kairo_core::{KairoError, Tool, ToolInput, ToolOutput};
 
 /// A registry for managing available tools.
+#[derive(Clone)]
 pub struct ToolRegistry {
-    tools: RwLock<HashMap<String, Arc<dyn Tool>>>,
+    tools: Arc<RwLock<HashMap<String, Arc<dyn Tool>>>>,
 }
 
 impl ToolRegistry {
     pub fn new() -> Self {
         Self {
-            tools: RwLock::new(HashMap::new()),
+            tools: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -39,7 +40,10 @@ impl ToolRegistry {
         let tool = self
             .get(name)
             .await
-            .ok_or_else(|| KairoError::Tool(format!("Tool '{}' not found", name)))?;
+            .ok_or_else(|| KairoError::Tool {
+                name: name.to_string(),
+                message: format!("Tool '{}' not found", name),
+            })?;
         debug!(tool_name = %name, "executing tool");
         tool.execute(input).await
     }
@@ -79,10 +83,15 @@ impl Tool for CalculatorTool {
                 .arguments
                 .get("expression")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| KairoError::Tool("Missing 'expression' argument".into()))?;
+                .ok_or_else(|| KairoError::Tool {
+                    name: "calculator".to_string(),
+                    message: "Missing 'expression' argument".into(),
+                })?;
 
-            let result = meval::eval_str(expression)
-                .map_err(|e| KairoError::Tool(format!("Math error: {}", e)))?;
+            let result = meval::eval_str(expression).map_err(|e| KairoError::Tool {
+                name: "calculator".to_string(),
+                message: format!("Math error: {}", e),
+            })?;
 
             Ok(ToolOutput {
                 result: serde_json::json!({"result": result}),
@@ -97,6 +106,7 @@ impl Tool for CalculatorTool {
 /// Requires `SERPAPI_KEY` or `BRAVE_API_KEY` environment variable
 /// for live search results. Falls back to a helpful message if
 /// no API key is configured.
+#[allow(dead_code)]
 pub struct WebSearchTool {
     client: reqwest::Client,
 }
@@ -106,6 +116,12 @@ impl WebSearchTool {
         Self {
             client: reqwest::Client::new(),
         }
+    }
+}
+
+impl Default for WebSearchTool {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -127,7 +143,10 @@ impl Tool for WebSearchTool {
                 .arguments
                 .get("query")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| KairoError::Tool("Missing 'query' argument".into()))?;
+                .ok_or_else(|| KairoError::Tool {
+                    name: "web_search".to_string(),
+                    message: "Missing 'query' argument".into(),
+                })?;
 
             warn!(query = %query, "web_search tool requires a search API key");
 
@@ -164,18 +183,27 @@ impl Tool for FileSystemTool {
                 .arguments
                 .get("operation")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| KairoError::Tool("Missing 'operation' argument".into()))?;
+                .ok_or_else(|| KairoError::Tool {
+                    name: "filesystem".to_string(),
+                    message: "Missing 'operation' argument".into(),
+                })?;
 
             let path = input
                 .arguments
                 .get("path")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| KairoError::Tool("Missing 'path' argument".into()))?;
+                .ok_or_else(|| KairoError::Tool {
+                    name: "filesystem".to_string(),
+                    message: "Missing 'path' argument".into(),
+                })?;
 
             match operation {
                 "read" => {
                     let content = tokio::fs::read_to_string(path).await.map_err(|e| {
-                        KairoError::Tool(format!("Failed to read file: {}", e))
+                        KairoError::Tool {
+                            name: "filesystem".to_string(),
+                            message: format!("Failed to read file: {}", e),
+                        }
                     })?;
                     Ok(ToolOutput {
                         result: serde_json::json!({"content": content}),
@@ -189,17 +217,20 @@ impl Tool for FileSystemTool {
                         .and_then(|v| v.as_str())
                         .unwrap_or("");
                     tokio::fs::write(path, content).await.map_err(|e| {
-                        KairoError::Tool(format!("Failed to write file: {}", e))
+                        KairoError::Tool {
+                            name: "filesystem".to_string(),
+                            message: format!("Failed to write file: {}", e),
+                        }
                     })?;
                     Ok(ToolOutput {
                         result: serde_json::json!({"written": true}),
                         success: true,
                     })
                 }
-                _ => Err(KairoError::Tool(format!(
-                    "Unknown operation: {}",
-                    operation
-                ))),
+                _ => Err(KairoError::Tool {
+                    name: "filesystem".to_string(),
+                    message: format!("Unknown operation: {}", operation),
+                }),
             }
         })
     }
@@ -226,13 +257,19 @@ impl Tool for CodeExecutionTool {
                 .arguments
                 .get("language")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| KairoError::Tool("Missing 'language' argument".into()))?;
+                .ok_or_else(|| KairoError::Tool {
+                    name: "code_execution".to_string(),
+                    message: "Missing 'language' argument".into(),
+                })?;
 
             let code = input
                 .arguments
                 .get("code")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| KairoError::Tool("Missing 'code' argument".into()))?;
+                .ok_or_else(|| KairoError::Tool {
+                    name: "code_execution".to_string(),
+                    message: "Missing 'code' argument".into(),
+                })?;
 
             warn!(language = %language, "code_execution requires kairo-sandbox integration");
 

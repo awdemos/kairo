@@ -45,7 +45,7 @@ pub enum Commands {
 pub async fn run(cli: Cli) -> Result<(), KairoError> {
     match cli.command {
         Commands::Chat { model, message } => {
-            let model_id = parse_model(model.as_deref().unwrap_or("gpt-4o"));
+            let model_id = parse_model(model.as_deref().unwrap_or("gpt-4o"))?;
             info!(model = ?model_id, "starting chat session");
 
             let api_key = get_api_key(&model_id)?;
@@ -86,7 +86,7 @@ pub async fn run(cli: Cli) -> Result<(), KairoError> {
             Ok(())
         }
         Commands::Agent { task, model } => {
-            let model_id = parse_model(&model);
+            let model_id = parse_model(&model)?;
             info!(task = %task, model = ?model_id, "running agent task");
 
             let api_key = get_api_key(&model_id)?;
@@ -161,9 +161,11 @@ pub async fn run(cli: Cli) -> Result<(), KairoError> {
             let react_agent = ReActAgent::new(agent, memory, tools, council);
             let agents = Arc::new(tokio::sync::RwLock::new(vec![react_agent]));
 
+            let telemetry = kairo_telemetry::build_default();
             let state = ApiState {
                 agents,
                 engine: Arc::new(kairo_orchestrator::WorkflowEngine::new()),
+                telemetry,
             };
 
             println!("Kairo API server running on http://0.0.0.0:{}", port);
@@ -172,19 +174,9 @@ pub async fn run(cli: Cli) -> Result<(), KairoError> {
     }
 }
 
-fn parse_model(name: &str) -> ModelId {
-    match name {
-        "gpt-4o" => ModelId::Gpt4o,
-        "gpt-4o-mini" => ModelId::Gpt4oMini,
-        "claude-3-5-sonnet" => ModelId::Claude3_5Sonnet,
-        "claude-3-opus" => ModelId::Claude3Opus,
-        "gemini-2.0-flash" => ModelId::Gemini2_0Flash,
-        "gemini-1.5-pro" => ModelId::Gemini1_5Pro,
-        "grok-2" => ModelId::Grok2,
-        "llama-3-70b" => ModelId::Llama3_70b,
-        "mistral-large" => ModelId::MistralLarge,
-        _ => ModelId::Custom(name.to_string()),
-    }
+fn parse_model(name: &str) -> Result<ModelId, KairoError> {
+    ModelId::resolve(name)
+        .ok_or_else(|| KairoError::Model(format!("Unknown model: {}", name)))
 }
 
 fn get_api_key(model: &ModelId) -> Result<String, KairoError> {

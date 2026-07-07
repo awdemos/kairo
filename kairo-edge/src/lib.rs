@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use kairo_core::{CompletionOptions, CompletionResponse, KairoError, Message, ModelId};
+use kairo_core::Message;
 
 #[wasm_bindgen]
+#[allow(dead_code)]
 pub struct EdgeAgent {
     model: String,
     api_key: String,
@@ -21,7 +22,7 @@ impl EdgeAgent {
         let msgs: Vec<EdgeMessage> = serde_wasm_bindgen::from_value(messages)
             .map_err(|e| JsValue::from_str(&format!("Parse error: {}", e)))?;
 
-        let core_messages: Vec<Message> = msgs.into_iter().map(|m| Message {
+        let _core_messages: Vec<Message> = msgs.into_iter().map(|m| Message {
             role: match m.role.as_str() {
                 "system" => kairo_core::Role::System,
                 "assistant" => kairo_core::Role::Assistant,
