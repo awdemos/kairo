@@ -6,14 +6,15 @@ use tracing::{debug, instrument, warn};
 use kairo_core::{KairoError, Tool, ToolInput, ToolOutput};
 
 /// A registry for managing available tools.
+#[derive(Clone)]
 pub struct ToolRegistry {
-    tools: RwLock<HashMap<String, Arc<dyn Tool>>>,
+    tools: Arc<RwLock<HashMap<String, Arc<dyn Tool>>>>,
 }
 
 impl ToolRegistry {
     pub fn new() -> Self {
         Self {
-            tools: RwLock::new(HashMap::new()),
+            tools: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
