@@ -1,11 +1,10 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use kairo_agents::ReActAgent;
 use kairo_core::{Agent, AgentConfig, CompletionOptions, Context, Message, ModelId, Role, Subtask, Task, TaskStatus, TaskType, Workflow, WorkflowStatus};
 use kairo_council::{bootstrap_council, default_council};
 use kairo_memory::HybridMemory;
-use kairo_orchestrator::WorkflowEngine;
+use kairo_orchestrator::{TaskRunner, WorkflowEngine};
 use kairo_tools::default_registry;
 
 #[tokio::main]
@@ -120,7 +119,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let engine = WorkflowEngine::new();
-    let mut agents = HashMap::new();
 
     let agent1 = Arc::new(ReActAgent::new(
         Agent {
@@ -132,14 +130,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tools.clone(),
         council.clone(),
     ));
-    agents.insert(task1_id, agent1.clone());
-    agents.insert(task2_id, agent1.clone());
-    agents.insert(task3_id, agent1);
 
-    engine.register(workflow, agents).await?;
+    let workflow_id = workflow.id;
+    engine.register(workflow).await?;
     let ctx = Context::new(uuid::Uuid::new_v4());
 
-    match engine.execute(task1_id, ctx).await {
+    match engine.execute(workflow_id, ctx, agent1 as Arc<dyn TaskRunner>).await {
         Ok(result) => {
             println!("   Workflow completed with {} outputs", result.outputs.len());
             for (id, output) in result.outputs {

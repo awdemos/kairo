@@ -6,8 +6,6 @@ use axum::{
     Router,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::convert::Infallible;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -147,7 +145,7 @@ async fn create_workflow(
         status: kairo_core::WorkflowStatus::Draft,
     };
 
-    state.engine.register(workflow, HashMap::new()).await.map_err(into_response)?;
+    state.engine.register(workflow).await.map_err(into_response)?;
 
     Ok(Json(WorkflowResponse {
         workflow_id: workflow_id.to_string(),
