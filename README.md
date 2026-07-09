@@ -1,6 +1,6 @@
-# Kairo
+# Kairo — Rust AI Agent Orchestrator with Model Routing, ReAct Tools & DAG Workflows
 
-> *Kairos* — the decisive moment. An agentic AI orchestrator that routes tasks to the right model, executes tools safely, and coordinates multi-step workflows.
+> **Kairo** is a model-agnostic agentic AI orchestrator written in Rust. It routes tasks to the best LLM, runs ReAct-loop agents with safe tool use, and executes multi-step workflows as DAGs — with memory, subagents, and WASM-sandboxed connectors.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE-MIT)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE-APACHE)
